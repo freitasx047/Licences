@@ -75,8 +75,18 @@ const typeLabel = (l) => l.type === 'lifetime' ? 'Vitalícia' : l.type === 'days
 function render() {
   const act_ = S.blocks.filter((b) => b.active);
   const bb = $('#badgeBlocked'); bb.textContent = act_.length; bb.classList.toggle('hidden', !act_.length);
-  renderOverview(act_); renderKeys(); renderBlocked(act_); renderManifest(); renderLogs();
+  fillProducts(); renderOverview(act_); renderKeys(); renderBlocked(act_); renderManifest(); renderLogs();
   $('#setMaxInv').value = S.settings.maxInvalidAttempts;
+}
+
+function fillProducts() {
+  for (const id of ['#gProduct', '#mProduct']) {
+    const sel = $(id); const prev = sel.value;
+    if (sel.options.length !== S.products.length) {
+      sel.replaceChildren(...S.products.map((p) => el('option', { value: p, text: p })));
+      if (prev) sel.value = prev;
+    }
+  }
 }
 
 function renderOverview(blocked) {
@@ -89,9 +99,9 @@ function renderOverview(blocked) {
   $('#tab-overview').replaceChildren(
     el('div', { class: 'stats' }, stats.map(([k, v]) => el('div', { class: 'stat' }, el('b', { text: v }), el('span', { text: k })))),
     el('div', { class: 'card' }, el('h2', { text: 'Online recentemente (últimas 24h)' }),
-      table(['Key', 'Comprador/Obs.', 'Servidor', 'IP', 'Última vez'],
+      table(['Key', 'Produto', 'Comprador/Obs.', 'Servidor', 'IP', 'Última vez'],
         L.filter((l) => l.lastSeen && S.now - l.lastSeen < 86400).sort((a, b) => b.lastSeen - a.lastSeen).slice(0, 15)
-          .map((l) => [l.key, l.buyer || l.note || '—', l.lastServer || '—', l.lastIp || '—', fmt(l.lastSeen)]))));
+          .map((l) => [l.key, l.product || 'new_vehicles', l.buyer || l.note || '—', l.lastServer || '—', l.lastIp || '—', fmt(l.lastSeen)]))));
 }
 
 function table(head, rows) {
@@ -106,7 +116,7 @@ const btn = (txt, cls, onclick) => el('button', { class: 'sm ' + (cls || ''), te
 
 function renderKeys() {
   const q = $('#keySearch').value.toLowerCase();
-  const list = S.licenses.filter((l) => !q || [l.key, l.buyer, l.note, l.lastIp, l.lastServer].join(' ').toLowerCase().includes(q));
+  const list = S.licenses.filter((l) => !q || [l.key, l.product, l.buyer, l.note, l.lastIp, l.lastServer].join(' ').toLowerCase().includes(q));
   const rows = list.map((l) => {
     const [txt, cls] = licStatus(l);
     const actions = el('div', {},
@@ -121,10 +131,10 @@ function renderKeys() {
       btn('Reset IPs', '', () => confirm('Liberar a key para um novo IP?') && act('keys/' + l.key + '/reset-ips', {}, 'IPs resetados')),
       btn('Reset base', '', () => confirm('Resetar manifesto base desta key?') && act('keys/' + l.key + '/reset-baseline', {}, 'Base resetada')),
       btn('Excluir', 'danger', () => confirm('Excluir ' + l.key + ' definitivamente?') && act('keys/' + l.key + '/delete', {}, 'Excluída')));
-    return [el('code', { text: l.key }), pill(txt, cls), typeLabel(l), l.buyer || l.note || '—',
+    return [el('code', { text: l.key }), l.product || 'new_vehicles', pill(txt, cls), typeLabel(l), l.buyer || l.note || '—',
       (l.ips || []).join(', ') + ' (' + (l.maxIps || 1) + ' máx)', l.expiresAt ? fmt(l.expiresAt) : (l.activatedAt ? 'Nunca' : '—'), fmt(l.lastSeen), actions];
   });
-  $('#keysTable').replaceChildren(...table(['Key', 'Status', 'Tipo', 'Comprador/Obs.', 'IPs', 'Expira', 'Visto', 'Ações'], rows).children);
+  $('#keysTable').replaceChildren(...table(['Key', 'Produto', 'Status', 'Tipo', 'Comprador/Obs.', 'IPs', 'Expira', 'Visto', 'Ações'], rows).children);
 }
 $('#keySearch').oninput = () => S && renderKeys();
 
@@ -137,9 +147,9 @@ function renderBlocked(blocked) {
 }
 
 function renderManifest() {
-  const rows = Object.entries(S.manifests).map(([v, m]) => [v, String(Object.keys(m.files).length) + ' arquivos', fmt(m.createdAt),
-    btn('Remover', 'danger', () => confirm('Remover manifesto v' + v + '?') && act('manifest/delete', { version: v }, 'Removido'))]);
-  $('#manifestTable').replaceChildren(...table(['Versão', 'Arquivos', 'Registrado em', ''], rows).children);
+  const rows = Object.entries(S.manifests).map(([k, m]) => [m.product || 'new_vehicles', m.version || k, String(Object.keys(m.files).length) + ' arquivos', fmt(m.createdAt),
+    btn('Remover', 'danger', () => confirm('Remover manifesto ' + k + '?') && act('manifest/delete', { key: k }, 'Removido'))]);
+  $('#manifestTable').replaceChildren(...table(['Produto', 'Versão', 'Arquivos', 'Registrado em', ''], rows).children);
 }
 
 function renderLogs() {
@@ -151,7 +161,7 @@ function renderLogs() {
 $('#gType').onchange = () => { $('#gAmount').disabled = $('#gType').value === 'lifetime'; };
 $('#btnGen').onclick = async () => {
   try {
-    const r = await api('keys/generate', { type: $('#gType').value, amount: $('#gAmount').value, quantity: $('#gQty').value,
+    const r = await api('keys/generate', { product: $('#gProduct').value, type: $('#gType').value, amount: $('#gAmount').value, quantity: $('#gQty').value,
       maxIps: $('#gIps').value, buyer: $('#gBuyer').value, note: $('#gNote').value, sold: $('#gSold').checked });
     const o = $('#genOut'); o.textContent = r.keys.join('\n'); o.classList.remove('hidden');
     toast(r.keys.length + ' key(s) gerada(s)'); await refresh();
@@ -159,9 +169,13 @@ $('#btnGen').onclick = async () => {
 };
 $('#btnSettings').onclick = () => act('settings', { maxInvalidAttempts: $('#setMaxInv').value }, 'Configuração salva');
 $('#btnManifest').onclick = async () => {
-  let ver = $('#mVer').value.trim(); const raw = $('#mJson').value.trim();
-  try { const j = JSON.parse(raw); if (!ver && j.version) ver = j.version; } catch (e) { return toast('JSON inválido', true); }
-  await act('manifest/set', { version: ver, manifest: raw }, 'Manifesto registrado');
+  let ver = $('#mVer').value.trim(); let product = $('#mProduct').value; const raw = $('#mJson').value.trim();
+  try {
+    const j = JSON.parse(raw);
+    if (!ver && j.version) ver = j.version;
+    if (j.product && S.products.includes(j.product)) product = j.product;
+  } catch (e) { return toast('JSON inválido', true); }
+  await act('manifest/set', { version: ver, product, manifest: raw }, 'Manifesto registrado');
 };
 
 boot();
