@@ -14,12 +14,13 @@ try {
   }
 } catch (e) { /* sem .env */ }
 
-const PORT = +process.env.PORT || 3009;
+const PORT = +process.env.PORT || 3000;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
 const PRODUCT_SECRET = process.env.PRODUCT_SECRET || '';
 const TRUST_PROXY = process.env.TRUST_PROXY === '1';
 const DISCORD_WEBHOOK = process.env.DISCORD_WEBHOOK || '';
-const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
+const os = require('os');
+const ORIG_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 const PRODUCT = 'new_vehicles';
 
 if (!ADMIN_PASSWORD || !PRODUCT_SECRET || /troque/i.test(ADMIN_PASSWORD + PRODUCT_SECRET)) {
@@ -53,14 +54,30 @@ function getIp(req) {
 }
 
 // ---------- banco (JSON) ----------
-fs.mkdirSync(DATA_DIR, { recursive: true });
+function writableDir(dir) {
+  try { fs.mkdirSync(dir, { recursive: true }); fs.accessSync(dir, fs.constants.W_OK); return true; } catch (e) { return false; }
+}
+// Em hosts com disco somente-leitura (ex.: Vercel) usa a pasta temporaria
+let DATA_DIR = ORIG_DIR;
+if (!writableDir(DATA_DIR)) {
+  DATA_DIR = path.join(os.tmpdir(), 'freitas-license');
+  writableDir(DATA_DIR);
+  console.warn('[aviso] disco somente-leitura; usando ' + DATA_DIR + ' (dados NAO sao permanentes nesse host)');
+}
 const DB_FILE = path.join(DATA_DIR, 'db.json');
 let db = { settings: { maxInvalidAttempts: 1 }, licenses: {}, blocks: {}, invalid: {}, manifests: {}, logs: [] };
-try { db = Object.assign(db, JSON.parse(fs.readFileSync(DB_FILE, 'utf8'))); } catch (e) { /* novo */ }
+for (const f of [DB_FILE, path.join(ORIG_DIR, 'db.json')]) {
+  try { db = Object.assign(db, JSON.parse(fs.readFileSync(f, 'utf8'))); break; } catch (e) { /* tenta o proximo */ }
+}
+// Nunca lanca erro: falha de gravacao nao pode virar HTTP 500
 function save() {
-  const tmp = DB_FILE + '.tmp';
-  fs.writeFileSync(tmp, JSON.stringify(db));
-  fs.renameSync(tmp, DB_FILE);
+  try {
+    const tmp = DB_FILE + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify(db));
+    fs.renameSync(tmp, DB_FILE);
+  } catch (e) {
+    if (!save.warned) { console.error('[save] falha ao gravar o banco:', e.message); save.warned = true; }
+  }
 }
 function log(type, msg, extra) {
   db.logs.unshift(Object.assign({ t: now(), type, msg }, extra || {}));
