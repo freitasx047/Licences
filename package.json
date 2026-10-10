@@ -1,0 +1,8 @@
+{
+  "name": "freitas-license-server",
+  "version": "1.0.0",
+  "description": "Servidor de licencas do New Vehicles (by Freitas) - sem dependencias",
+  "main": "server.js",
+  "scripts": { "start": "node server.js", "test": "node tools/selftest.js" },
+  "engines": { "node": ">=16" }
+}
