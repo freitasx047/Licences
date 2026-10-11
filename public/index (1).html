@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Freitas • Painel administrativo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="/style.css">
+<script src="https://unpkg.com/lucide@0.453.0/dist/umd/lucide.min.js"></script>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login" class="center hidden">
+  <div class="login-card">
+    <div class="brand-mark big"><i data-lucide="shield-check"></i></div>
+    <h1>Freitas • Licenças</h1>
+    <p class="muted">Painel administrativo</p>
+    <label class="field">Senha de administrador
+      <span class="input-ic"><i data-lucide="lock-keyhole"></i>
+        <input id="pw" type="password" placeholder="Digite sua senha" autocomplete="current-password">
+      </span>
+    </label>
+    <button id="btnLogin" class="primary block"><i data-lucide="log-in"></i> Entrar</button>
+    <p id="loginErr" class="err"></p>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" class="shell hidden">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark"><i data-lucide="shield-check"></i></div>
+      <div>
+        <strong>Freitas</strong>
+        <span>Licenças</span>
+      </div>
+    </div>
+
+    <nav id="tabs">
+      <button data-tab="overview" class="active"><i data-lucide="layout-dashboard"></i><span>Visão geral</span></button>
+      <button data-tab="keys"><i data-lucide="key-round"></i><span>Keys</span></button>
+      <button data-tab="blocked"><i data-lucide="ban"></i><span>Bloqueados</span><b id="badgeBlocked" class="badge hidden">0</b></button>
+      <button data-tab="manifest"><i data-lucide="file-json-2"></i><span>Manifesto</span></button>
+      <button data-tab="logs"><i data-lucide="scroll-text"></i><span>Logs</span></button>
+    </nav>
+
+    <div class="side-foot">
+      <div class="live"><span class="live-dot"></span> Ao vivo · atualiza a cada 15s</div>
+      <button id="btnLogout" class="ghost block"><i data-lucide="log-out"></i> Sair</button>
+    </div>
+  </aside>
+
+  <div class="content">
+    <div class="topbar">
+      <div>
+        <h1 id="pageTitle">Visão geral</h1>
+        <p id="pageSub" class="muted">Resumo das suas licenças e atividade recente</p>
+      </div>
+      <button id="btnRefresh" class="ghost" title="Atualizar agora"><i data-lucide="refresh-cw"></i> Atualizar</button>
+    </div>
+
+    <main>
+      <section id="tab-overview" class="tab"></section>
+
+      <section id="tab-keys" class="tab hidden">
+        <div class="card">
+          <div class="card-head"><i data-lucide="sparkles"></i><div><h2>Gerar keys</h2><p class="muted">Crie uma ou várias keys de uma vez</p></div></div>
+          <div class="grid">
+            <label>Produto
+              <select id="gProduct"></select>
+            </label>
+            <label>Tipo
+              <select id="gType"><option value="lifetime">Vitalícia</option><option value="days">Dias</option><option value="hours">Horas</option></select>
+            </label>
+            <label>Duração <input id="gAmount" type="number" min="1" value="30" disabled></label>
+            <label>Quantidade <input id="gQty" type="number" min="1" max="100" value="1"></label>
+            <label>IPs permitidos <input id="gIps" type="number" min="1" max="10" value="1"></label>
+            <label>Comprador (opcional) <input id="gBuyer" maxlength="80" placeholder="Nome do comprador"></label>
+            <label>Observação <input id="gNote" maxlength="120" placeholder="Ex.: servidor X"></label>
+          </div>
+          <label class="check"><input id="gSold" type="checkbox"> Já criar como <b>vendida</b> (exige nome do comprador)</label>
+          <div class="actions-row">
+            <button id="btnGen" class="primary"><i data-lucide="wand-sparkles"></i> Gerar keys</button>
+            <button id="btnCopyGen" class="hidden"><i data-lucide="copy"></i> Copiar todas</button>
+          </div>
+          <div id="genOut" class="genout hidden"></div>
+        </div>
+
+        <div class="card">
+          <div class="row">
+            <div class="card-head flush"><i data-lucide="list"></i><div><h2>Todas as keys</h2></div></div>
+            <span class="input-ic search"><i data-lucide="search"></i><input id="keySearch" placeholder="Buscar key, comprador ou IP"></span>
+          </div>
+          <div class="scroll"><table id="keysTable"></table></div>
+        </div>
+      </section>
+
+      <section id="tab-blocked" class="tab hidden">
+        <div class="card">
+          <div class="card-head"><i data-lucide="shield-alert" class="tone-bad"></i><div><h2>Bloqueados</h2>
+            <p class="muted">Quem tentou usar sem key, com key inválida, em outro IP ou adulterou arquivos. Só volta a funcionar se você clicar em <b>Desbloquear</b>.</p></div></div>
+          <div class="scroll"><table id="blockTable"></table></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><i data-lucide="siren"></i><div><h2>Regra de bloqueio automático</h2><p class="muted">Define quando um IP é bloqueado sozinho</p></div></div>
+          <div class="inline-form">
+            <span>Bloquear o IP após</span>
+            <input id="setMaxInv" type="number" min="1" max="50" style="width:84px">
+            <span>tentativa(s) com key inválida ou ausente</span>
+            <button id="btnSettings" class="primary"><i data-lucide="save"></i> Salvar</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="tab-manifest" class="tab hidden">
+        <div class="card">
+          <div class="card-head"><i data-lucide="fingerprint"></i><div><h2>Manifesto oficial (anti-adulteração)</h2>
+            <p class="muted">Depois de compilar, rode <code>node tools/gen-manifest.js ../new_vehicles</code> e cole o JSON abaixo. Qualquer arquivo diferente = key bloqueada + IP bloqueado.</p></div></div>
+          <div class="grid" style="max-width:440px">
+            <label>Produto <select id="mProduct"></select></label>
+            <label>Versão <input id="mVer" placeholder="2.0.0"></label>
+          </div>
+          <textarea id="mJson" rows="8" placeholder='{"version":"2.0.0","files":{"meta.xml":"..."}}'></textarea>
+          <button id="btnManifest" class="primary"><i data-lucide="upload"></i> Registrar manifesto</button>
+        </div>
+        <div class="card">
+          <div class="card-head"><i data-lucide="archive"></i><div><h2>Manifestos registrados</h2></div></div>
+          <div class="scroll"><table id="manifestTable"></table></div>
+        </div>
+      </section>
+
+      <section id="tab-logs" class="tab hidden">
+        <div class="card">
+          <div class="card-head"><i data-lucide="activity"></i><div><h2>Últimos eventos</h2></div></div>
+          <div class="scroll"><table id="logTable"></table></div>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+<script src="/app.js"></script>
+</body>
+</html>
